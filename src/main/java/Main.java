@@ -8,7 +8,6 @@ public class Main {
             System.out.print("$ ");
             String cmd = sc.nextLine();
             System.out.println(cmd + ": command not found");
-            System.out.print("$ ");
         }
     }
 }
