@@ -7,9 +7,14 @@ public class Main {
         while (true) {
             System.out.print("$ ");
             String cmd = sc.nextLine();
+            
             if(cmd.equals("exit")){
                 break;
             }
+            else if(cmd.startsWith("echo ")){
+                System.out.println(cmd.substring(5));
+            }
+
             System.out.println(cmd + ": command not found");
         }
     }
