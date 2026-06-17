@@ -1,4 +1,5 @@
 import java.util.*;
+import java.io.File;
 
 public class Main {
     public static void main(String[] args) throws Exception {
@@ -8,7 +9,7 @@ public class Main {
             System.out.print("$ ");
             String cmd = sc.nextLine();
 
-            if(cmd.equals("exit")){
+            if(cmd.equals("exit") || cmd.equals("exit 0")){
                 break;
             }
             else if(cmd.startsWith("echo ")){
@@ -19,7 +20,22 @@ public class Main {
                 if(sub.equals("exit") || sub.equals("echo") || sub.equals("type")){
                     System.out.println(sub + " is a shell builtin");
                 }
-                else System.out.println(sub + ": not found");
+                else {
+                    // Search for the command in PATH
+                    String[] pathDirs = System.getenv("PATH").split(File.pathSeparator);
+                    boolean found = false;
+                    for (String dir : pathDirs) {
+                        File file = new File(dir, sub);
+                        if (file.exists() && file.canExecute()) {
+                            System.out.println(sub + " is " + file.getAbsolutePath());
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        System.out.println(sub + ": not found");
+                    }
+                }
             }
             else System.out.println(cmd + ": command not found");
         }
