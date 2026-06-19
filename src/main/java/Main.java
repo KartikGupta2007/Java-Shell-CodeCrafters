@@ -28,9 +28,10 @@ public class Main {
             String redirectTarget = parsedCommand.stdoutRedirectTarget;
             boolean appendStdout = parsedCommand.appendStdout;
             String stderrRedirectTarget = parsedCommand.stderrRedirectTarget;
+            boolean appendStderr = parsedCommand.appendStderr;
 
             prepareRedirectTarget(redirectTarget, appendStdout);
-            prepareRedirectTarget(stderrRedirectTarget);
+            prepareRedirectTarget(stderrRedirectTarget, appendStderr);
 
             if(commandName.equals("exit") && (commandParts.size() == 1 || commandParts.get(1).equals("0"))){
                 break;
@@ -52,7 +53,7 @@ public class Main {
                 if (newDirectory != null && newDirectory.isDirectory()) {
                     currentDirectory = newDirectory.getCanonicalFile();
                 } else {
-                    writeError("cd: " + directory + ": No such file or directory" + System.lineSeparator(), parsedCommand.stderrRedirectTarget);
+                    writeError("cd: " + directory + ": No such file or directory" + System.lineSeparator(), stderrRedirectTarget, appendStderr);
                 }
             }
             else if(commandName.equals("type") && commandParts.size() > 1){
@@ -65,7 +66,7 @@ public class Main {
                     if (executable != null) {
                         writeOutput(sub + " is " + executable.getAbsolutePath() + System.lineSeparator(), redirectTarget, appendStdout);
                     } else {
-                        writeError(sub + ": not found" + System.lineSeparator(), parsedCommand.stderrRedirectTarget);
+                        writeError(sub + ": not found" + System.lineSeparator(), stderrRedirectTarget, appendStderr);
                     }
                 }
             }
@@ -87,21 +88,19 @@ public class Main {
                     }
 
                     if (stderrRedirectTarget != null) {
-                        processBuilder.redirectError(new File(stderrRedirectTarget));
+                        if (appendStderr) {
+                            processBuilder.redirectError(ProcessBuilder.Redirect.appendTo(new File(stderrRedirectTarget)));
+                        } else {
+                            processBuilder.redirectError(new File(stderrRedirectTarget));
+                        }
                     }
 
                     Process process = processBuilder.start();
                     process.waitFor();
                 } else {
-                    writeError(cmd + ": command not found" + System.lineSeparator(), stderrRedirectTarget);
+                    writeError(cmd + ": command not found" + System.lineSeparator(), stderrRedirectTarget, appendStderr);
                 }
             }
-        }
-    }
-
-    private static void prepareRedirectTarget(String redirectTarget) throws Exception {
-        if (redirectTarget != null) {
-            Files.writeString(Path.of(redirectTarget), "");
         }
     }
 
@@ -123,9 +122,13 @@ public class Main {
         }
     }
 
-    private static void writeError(String output, String redirectTarget) throws Exception {
+    private static void writeError(String output, String redirectTarget, boolean append) throws Exception {
         if (redirectTarget != null) {
-            Files.writeString(Path.of(redirectTarget), output);
+            if (append) {
+                Files.writeString(Path.of(redirectTarget), output, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+            } else {
+                Files.writeString(Path.of(redirectTarget), output);
+            }
         } else {
             System.err.print(output);
         }
@@ -179,6 +182,7 @@ public class Main {
         String redirectTarget = null;
         boolean appendStdout = false;
         String stderrRedirectTarget = null;
+        boolean appendStderr = false;
         List<String> filteredArgs = new ArrayList<>();
 
         for (int i = 0; i < args.size(); i++) {
@@ -187,15 +191,16 @@ public class Main {
                 redirectTarget = args.get(i + 1);
                 appendStdout = arg.contains(">>");
                 i++;
-            } else if (arg.equals("2>") && i + 1 < args.size()) {
+            } else if ((arg.equals("2>") || arg.equals("2>>")) && i + 1 < args.size()) {
                 stderrRedirectTarget = args.get(i + 1);
+                appendStderr = arg.equals("2>>");
                 i++;
             } else {
                 filteredArgs.add(arg);
             }
         }
 
-        return new ParsedCommand(filteredArgs, redirectTarget, appendStdout, stderrRedirectTarget);
+        return new ParsedCommand(filteredArgs, redirectTarget, appendStdout, stderrRedirectTarget, appendStderr);
     }
 
     private static class ParsedCommand {
@@ -203,12 +208,14 @@ public class Main {
         private final String stdoutRedirectTarget;
         private final boolean appendStdout;
         private final String stderrRedirectTarget;
+        private final boolean appendStderr;
 
-        private ParsedCommand(List<String> arguments, String stdoutRedirectTarget, boolean appendStdout, String stderrRedirectTarget) {
+        private ParsedCommand(List<String> arguments, String stdoutRedirectTarget, boolean appendStdout, String stderrRedirectTarget, boolean appendStderr) {
             this.arguments = arguments;
             this.stdoutRedirectTarget = stdoutRedirectTarget;
             this.appendStdout = appendStdout;
             this.stderrRedirectTarget = stderrRedirectTarget;
+            this.appendStderr = appendStderr;
         }
     }
 
