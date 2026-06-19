@@ -31,9 +31,12 @@ public class Main {
             else if(cmd.startsWith("cd ")){
                 String directory = cmd.substring(3);
                 File newDirectory = new File(directory);
+                if (!newDirectory.isAbsolute()) {
+                    newDirectory = new File(currentDirectory, directory);
+                }
 
-                if (newDirectory.isAbsolute() && newDirectory.isDirectory()) {
-                    currentDirectory = newDirectory;
+                if (newDirectory.isDirectory()) {
+                    currentDirectory = newDirectory.getCanonicalFile();
                 } else {
                     System.out.println("cd: " + directory + ": No such file or directory");
                 }
