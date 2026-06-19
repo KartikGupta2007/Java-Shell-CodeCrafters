@@ -2,10 +2,11 @@ import java.util.*;
 import java.io.File;
 
 public class Main {
-    private static final Set<String> BUILTINS = Set.of("exit", "echo", "type", "pwd");
+    private static final Set<String> BUILTINS = Set.of("exit", "echo", "type", "pwd", "cd");
 
     public static void main(String[] args) throws Exception {
         Scanner sc = new Scanner(System.in);
+        File currentDirectory = new File(System.getProperty("user.dir"));
 
         while (true) {
             System.out.print("$ ");
@@ -25,7 +26,17 @@ public class Main {
                 System.out.println(cmd.substring(5));
             }
             else if(cmd.equals("pwd")){
-                System.out.println(System.getProperty("user.dir"));
+                System.out.println(currentDirectory.getAbsolutePath());
+            }
+            else if(cmd.startsWith("cd ")){
+                String directory = cmd.substring(3);
+                File newDirectory = new File(directory);
+
+                if (newDirectory.isAbsolute() && newDirectory.isDirectory()) {
+                    currentDirectory = newDirectory;
+                } else {
+                    System.out.println("cd: " + directory + ": No such file or directory");
+                }
             }
             else if(cmd.startsWith("type")){
                 String sub = cmd.substring(5);
@@ -45,6 +56,7 @@ public class Main {
                 File executable = findExecutable(commandName);
                 if (executable != null) {
                     Process process = new ProcessBuilder(commandParts)
+                            .directory(currentDirectory)
                             .inheritIO()
                             .start();
                     process.waitFor();
