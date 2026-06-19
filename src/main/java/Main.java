@@ -26,6 +26,10 @@ public class Main {
 
             String commandName = commandParts.get(0);
             String redirectTarget = parsedCommand.redirectTarget;
+            String stderrRedirectTarget = parsedCommand.stderrRedirectTarget;
+
+            prepareRedirectTarget(redirectTarget);
+            prepareRedirectTarget(stderrRedirectTarget);
 
             if(commandName.equals("exit") && (commandParts.size() == 1 || commandParts.get(1).equals("0"))){
                 break;
@@ -77,16 +81,22 @@ public class Main {
                         processBuilder.inheritIO();
                     }
 
-                    if (parsedCommand.stderrRedirectTarget != null) {
-                        processBuilder.redirectError(new File(parsedCommand.stderrRedirectTarget));
+                    if (stderrRedirectTarget != null) {
+                        processBuilder.redirectError(new File(stderrRedirectTarget));
                     }
 
                     Process process = processBuilder.start();
                     process.waitFor();
                 } else {
-                    writeError(cmd + ": command not found" + System.lineSeparator(), parsedCommand.stderrRedirectTarget);
+                    writeError(cmd + ": command not found" + System.lineSeparator(), stderrRedirectTarget);
                 }
             }
+        }
+    }
+
+    private static void prepareRedirectTarget(String redirectTarget) throws Exception {
+        if (redirectTarget != null) {
+            Files.writeString(Path.of(redirectTarget), "");
         }
     }
 
