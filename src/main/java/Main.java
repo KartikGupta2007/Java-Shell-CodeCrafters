@@ -41,7 +41,6 @@ public class Main {
             else {
                 File executable = findExecutable(commandName);
                 if (executable != null) {
-                    commandParts[0] = executable.getAbsolutePath();
                     Process process = new ProcessBuilder(commandParts)
                             .inheritIO()
                             .start();
