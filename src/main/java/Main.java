@@ -91,6 +91,15 @@ public class Main {
             } else if (currentChar == '"' && !inSingleQuotes) {
                 inDoubleQuotes = !inDoubleQuotes;
                 hasCurrentArg = true;
+            } else if (currentChar == '\\' && inDoubleQuotes && i + 1 < command.length()) {
+                char nextChar = command.charAt(i + 1);
+                if (nextChar == '"' || nextChar == '\\') {
+                    currentArg.append(nextChar);
+                    i++;
+                } else {
+                    currentArg.append(currentChar);
+                }
+                hasCurrentArg = true;
             } else if (currentChar == '\\' && !inSingleQuotes && !inDoubleQuotes && i + 1 < command.length()) {
                 currentArg.append(command.charAt(i + 1));
                 hasCurrentArg = true;
