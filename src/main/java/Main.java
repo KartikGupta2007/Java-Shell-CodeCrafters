@@ -30,12 +30,13 @@ public class Main {
             }
             else if(cmd.startsWith("cd ")){
                 String directory = cmd.substring(3);
-                File newDirectory = new File(directory);
-                if (!newDirectory.isAbsolute()) {
+                String targetDirectory = directory.equals("~") ? System.getenv("HOME") : directory;
+                File newDirectory = targetDirectory == null ? null : new File(targetDirectory);
+                if (newDirectory != null && !newDirectory.isAbsolute()) {
                     newDirectory = new File(currentDirectory, directory);
                 }
 
-                if (newDirectory.isDirectory()) {
+                if (newDirectory != null && newDirectory.isDirectory()) {
                     currentDirectory = newDirectory.getCanonicalFile();
                 } else {
                     System.out.println("cd: " + directory + ": No such file or directory");
