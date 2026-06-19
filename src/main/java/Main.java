@@ -79,15 +79,19 @@ public class Main {
         List<String> args = new ArrayList<>();
         StringBuilder currentArg = new StringBuilder();
         boolean inSingleQuotes = false;
+        boolean inDoubleQuotes = false;
         boolean hasCurrentArg = false;
 
         for (int i = 0; i < command.length(); i++) {
             char currentChar = command.charAt(i);
 
-            if (currentChar == '\'') {
+            if (currentChar == '\'' && !inDoubleQuotes) {
                 inSingleQuotes = !inSingleQuotes;
                 hasCurrentArg = true;
-            } else if (Character.isWhitespace(currentChar) && !inSingleQuotes) {
+            } else if (currentChar == '"' && !inSingleQuotes) {
+                inDoubleQuotes = !inDoubleQuotes;
+                hasCurrentArg = true;
+            } else if (Character.isWhitespace(currentChar) && !inSingleQuotes && !inDoubleQuotes) {
                 if (hasCurrentArg) {
                     args.add(currentArg.toString());
                     currentArg.setLength(0);
