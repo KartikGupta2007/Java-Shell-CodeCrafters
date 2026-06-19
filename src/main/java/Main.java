@@ -91,6 +91,10 @@ public class Main {
             } else if (currentChar == '"' && !inSingleQuotes) {
                 inDoubleQuotes = !inDoubleQuotes;
                 hasCurrentArg = true;
+            } else if (currentChar == '\\' && !inSingleQuotes && !inDoubleQuotes && i + 1 < command.length()) {
+                currentArg.append(command.charAt(i + 1));
+                hasCurrentArg = true;
+                i++;
             } else if (Character.isWhitespace(currentChar) && !inSingleQuotes && !inDoubleQuotes) {
                 if (hasCurrentArg) {
                     args.add(currentArg.toString());
