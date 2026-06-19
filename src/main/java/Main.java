@@ -25,20 +25,21 @@ public class Main {
             }
 
             String commandName = commandParts.get(0);
-            String redirectTarget = parsedCommand.redirectTarget;
+            String redirectTarget = parsedCommand.stdoutRedirectTarget;
+            boolean appendStdout = parsedCommand.appendStdout;
             String stderrRedirectTarget = parsedCommand.stderrRedirectTarget;
 
-            prepareRedirectTarget(redirectTarget);
+            prepareRedirectTarget(redirectTarget, appendStdout);
             prepareRedirectTarget(stderrRedirectTarget);
 
             if(commandName.equals("exit") && (commandParts.size() == 1 || commandParts.get(1).equals("0"))){
                 break;
             }
             else if(commandName.equals("echo")){
-                writeOutput(String.join(" ", commandParts.subList(1, commandParts.size())) + System.lineSeparator(), redirectTarget);
+                writeOutput(String.join(" ", commandParts.subList(1, commandParts.size())) + System.lineSeparator(), redirectTarget, appendStdout);
             }
             else if(commandName.equals("pwd")){
-                writeOutput(currentDirectory.getAbsolutePath() + System.lineSeparator(), redirectTarget);
+                writeOutput(currentDirectory.getAbsolutePath() + System.lineSeparator(), redirectTarget, appendStdout);
             }
             else if(commandName.equals("cd") && commandParts.size() > 1){
                 String directory = commandParts.get(1);
@@ -57,12 +58,12 @@ public class Main {
             else if(commandName.equals("type") && commandParts.size() > 1){
                 String sub = commandParts.get(1);
                 if(BUILTINS.contains(sub)){
-                    writeOutput(sub + " is a shell builtin" + System.lineSeparator(), redirectTarget);
+                    writeOutput(sub + " is a shell builtin" + System.lineSeparator(), redirectTarget, appendStdout);
                 }
                 else {
                     File executable = findExecutable(sub);
                     if (executable != null) {
-                        writeOutput(sub + " is " + executable.getAbsolutePath() + System.lineSeparator(), redirectTarget);
+                        writeOutput(sub + " is " + executable.getAbsolutePath() + System.lineSeparator(), redirectTarget, appendStdout);
                     } else {
                         writeError(sub + ": not found" + System.lineSeparator(), parsedCommand.stderrRedirectTarget);
                     }
@@ -76,7 +77,11 @@ public class Main {
                             .redirectError(ProcessBuilder.Redirect.INHERIT);
 
                     if (redirectTarget != null) {
-                        processBuilder.redirectOutput(new File(redirectTarget));
+                        if (appendStdout) {
+                            processBuilder.redirectOutput(ProcessBuilder.Redirect.appendTo(new File(redirectTarget)));
+                        } else {
+                            processBuilder.redirectOutput(new File(redirectTarget));
+                        }
                     } else {
                         processBuilder.inheritIO();
                     }
@@ -100,9 +105,19 @@ public class Main {
         }
     }
 
-    private static void writeOutput(String output, String redirectTarget) throws Exception {
+    private static void prepareRedirectTarget(String redirectTarget, boolean append) throws Exception {
+        if (redirectTarget != null && !append) {
+            Files.writeString(Path.of(redirectTarget), "");
+        }
+    }
+
+    private static void writeOutput(String output, String redirectTarget, boolean append) throws Exception {
         if (redirectTarget != null) {
-            Files.writeString(Path.of(redirectTarget), output);
+            if (append) {
+                Files.writeString(Path.of(redirectTarget), output, java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+            } else {
+                Files.writeString(Path.of(redirectTarget), output);
+            }
         } else {
             System.out.print(output);
         }
@@ -162,13 +177,15 @@ public class Main {
         }
 
         String redirectTarget = null;
+        boolean appendStdout = false;
         String stderrRedirectTarget = null;
         List<String> filteredArgs = new ArrayList<>();
 
         for (int i = 0; i < args.size(); i++) {
             String arg = args.get(i);
-            if ((arg.equals(">") || arg.equals("1>")) && i + 1 < args.size()) {
+            if ((arg.equals(">") || arg.equals("1>") || arg.equals(">>") || arg.equals("1>>")) && i + 1 < args.size()) {
                 redirectTarget = args.get(i + 1);
+                appendStdout = arg.contains(">>");
                 i++;
             } else if (arg.equals("2>") && i + 1 < args.size()) {
                 stderrRedirectTarget = args.get(i + 1);
@@ -178,17 +195,19 @@ public class Main {
             }
         }
 
-        return new ParsedCommand(filteredArgs, redirectTarget, stderrRedirectTarget);
+        return new ParsedCommand(filteredArgs, redirectTarget, appendStdout, stderrRedirectTarget);
     }
 
     private static class ParsedCommand {
         private final List<String> arguments;
-        private final String redirectTarget;
+        private final String stdoutRedirectTarget;
+        private final boolean appendStdout;
         private final String stderrRedirectTarget;
 
-        private ParsedCommand(List<String> arguments, String redirectTarget, String stderrRedirectTarget) {
+        private ParsedCommand(List<String> arguments, String stdoutRedirectTarget, boolean appendStdout, String stderrRedirectTarget) {
             this.arguments = arguments;
-            this.redirectTarget = redirectTarget;
+            this.stdoutRedirectTarget = stdoutRedirectTarget;
+            this.appendStdout = appendStdout;
             this.stderrRedirectTarget = stderrRedirectTarget;
         }
     }
