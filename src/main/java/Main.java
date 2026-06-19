@@ -16,20 +16,24 @@ public class Main {
                 continue;
             }
 
-            String[] commandParts = cmd.split("\\s+");
-            String commandName = commandParts[0];
+            List<String> commandParts = parseCommand(cmd);
+            if (commandParts.isEmpty()) {
+                continue;
+            }
 
-            if(cmd.equals("exit") || cmd.equals("exit 0")){
+            String commandName = commandParts.get(0);
+
+            if(commandName.equals("exit") && (commandParts.size() == 1 || commandParts.get(1).equals("0"))){
                 break;
             }
-            else if(cmd.startsWith("echo ")){
-                System.out.println(cmd.substring(5));
+            else if(commandName.equals("echo")){
+                System.out.println(String.join(" ", commandParts.subList(1, commandParts.size())));
             }
-            else if(cmd.equals("pwd")){
+            else if(commandName.equals("pwd")){
                 System.out.println(currentDirectory.getAbsolutePath());
             }
-            else if(cmd.startsWith("cd ")){
-                String directory = cmd.substring(3);
+            else if(commandName.equals("cd") && commandParts.size() > 1){
+                String directory = commandParts.get(1);
                 String targetDirectory = directory.equals("~") ? System.getenv("HOME") : directory;
                 File newDirectory = targetDirectory == null ? null : new File(targetDirectory);
                 if (newDirectory != null && !newDirectory.isAbsolute()) {
@@ -42,8 +46,8 @@ public class Main {
                     System.out.println("cd: " + directory + ": No such file or directory");
                 }
             }
-            else if(cmd.startsWith("type")){
-                String sub = cmd.substring(5);
+            else if(commandName.equals("type") && commandParts.size() > 1){
+                String sub = commandParts.get(1);
                 if(BUILTINS.contains(sub)){
                     System.out.println(sub + " is a shell builtin");
                 }
@@ -69,6 +73,37 @@ public class Main {
                 }
             }
         }
+    }
+
+    private static List<String> parseCommand(String command) {
+        List<String> args = new ArrayList<>();
+        StringBuilder currentArg = new StringBuilder();
+        boolean inSingleQuotes = false;
+        boolean hasCurrentArg = false;
+
+        for (int i = 0; i < command.length(); i++) {
+            char currentChar = command.charAt(i);
+
+            if (currentChar == '\'') {
+                inSingleQuotes = !inSingleQuotes;
+                hasCurrentArg = true;
+            } else if (Character.isWhitespace(currentChar) && !inSingleQuotes) {
+                if (hasCurrentArg) {
+                    args.add(currentArg.toString());
+                    currentArg.setLength(0);
+                    hasCurrentArg = false;
+                }
+            } else {
+                currentArg.append(currentChar);
+                hasCurrentArg = true;
+            }
+        }
+
+        if (hasCurrentArg) {
+            args.add(currentArg.toString());
+        }
+
+        return args;
     }
 
     private static File findExecutable(String command) {
