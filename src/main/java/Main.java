@@ -2,7 +2,7 @@ import java.util.*;
 import java.io.File;
 
 public class Main {
-    private static final Set<String> BUILTINS = Set.of("exit", "echo", "type");
+    private static final Set<String> BUILTINS = Set.of("exit", "echo", "type", "pwd");
 
     public static void main(String[] args) throws Exception {
         Scanner sc = new Scanner(System.in);
@@ -23,6 +23,9 @@ public class Main {
             }
             else if(cmd.startsWith("echo ")){
                 System.out.println(cmd.substring(5));
+            }
+            else if(cmd.equals("pwd")){
+                System.out.println(System.getProperty("user.dir"));
             }
             else if(cmd.startsWith("type")){
                 String sub = cmd.substring(5);
