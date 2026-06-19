@@ -1,5 +1,7 @@
 import java.util.*;
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 public class Main {
     private static final Set<String> BUILTINS = Set.of("exit", "echo", "type", "pwd", "cd");
@@ -16,21 +18,23 @@ public class Main {
                 continue;
             }
 
-            List<String> commandParts = parseCommand(cmd);
+            ParsedCommand parsedCommand = parseCommand(cmd);
+            List<String> commandParts = parsedCommand.arguments;
             if (commandParts.isEmpty()) {
                 continue;
             }
 
             String commandName = commandParts.get(0);
+            String redirectTarget = parsedCommand.redirectTarget;
 
             if(commandName.equals("exit") && (commandParts.size() == 1 || commandParts.get(1).equals("0"))){
                 break;
             }
             else if(commandName.equals("echo")){
-                System.out.println(String.join(" ", commandParts.subList(1, commandParts.size())));
+                writeOutput(String.join(" ", commandParts.subList(1, commandParts.size())) + System.lineSeparator(), redirectTarget);
             }
             else if(commandName.equals("pwd")){
-                System.out.println(currentDirectory.getAbsolutePath());
+                writeOutput(currentDirectory.getAbsolutePath() + System.lineSeparator(), redirectTarget);
             }
             else if(commandName.equals("cd") && commandParts.size() > 1){
                 String directory = commandParts.get(1);
@@ -49,24 +53,31 @@ public class Main {
             else if(commandName.equals("type") && commandParts.size() > 1){
                 String sub = commandParts.get(1);
                 if(BUILTINS.contains(sub)){
-                    System.out.println(sub + " is a shell builtin");
+                    writeOutput(sub + " is a shell builtin" + System.lineSeparator(), redirectTarget);
                 }
                 else {
                     File executable = findExecutable(sub);
                     if (executable != null) {
-                        System.out.println(sub + " is " + executable.getAbsolutePath());
+                        writeOutput(sub + " is " + executable.getAbsolutePath() + System.lineSeparator(), redirectTarget);
                     } else {
-                        System.out.println(sub + ": not found");
+                        writeOutput(sub + ": not found" + System.lineSeparator(), redirectTarget);
                     }
                 }
             }
             else {
                 File executable = findExecutable(commandName);
                 if (executable != null) {
-                    Process process = new ProcessBuilder(commandParts)
+                    ProcessBuilder processBuilder = new ProcessBuilder(commandParts)
                             .directory(currentDirectory)
-                            .inheritIO()
-                            .start();
+                            .redirectError(ProcessBuilder.Redirect.INHERIT);
+
+                    if (redirectTarget != null) {
+                        processBuilder.redirectOutput(new File(redirectTarget));
+                    } else {
+                        processBuilder.inheritIO();
+                    }
+
+                    Process process = processBuilder.start();
                     process.waitFor();
                 } else {
                     System.out.println(cmd + ": command not found");
@@ -75,7 +86,15 @@ public class Main {
         }
     }
 
-    private static List<String> parseCommand(String command) {
+    private static void writeOutput(String output, String redirectTarget) throws Exception {
+        if (redirectTarget != null) {
+            Files.writeString(Path.of(redirectTarget), output);
+        } else {
+            System.out.print(output);
+        }
+    }
+
+    private static ParsedCommand parseCommand(String command) {
         List<String> args = new ArrayList<>();
         StringBuilder currentArg = new StringBuilder();
         boolean inSingleQuotes = false;
@@ -120,7 +139,30 @@ public class Main {
             args.add(currentArg.toString());
         }
 
-        return args;
+        String redirectTarget = null;
+        List<String> filteredArgs = new ArrayList<>();
+
+        for (int i = 0; i < args.size(); i++) {
+            String arg = args.get(i);
+            if ((arg.equals(">") || arg.equals("1>")) && i + 1 < args.size()) {
+                redirectTarget = args.get(i + 1);
+                i++;
+            } else {
+                filteredArgs.add(arg);
+            }
+        }
+
+        return new ParsedCommand(filteredArgs, redirectTarget);
+    }
+
+    private static class ParsedCommand {
+        private final List<String> arguments;
+        private final String redirectTarget;
+
+        private ParsedCommand(List<String> arguments, String redirectTarget) {
+            this.arguments = arguments;
+            this.redirectTarget = redirectTarget;
+        }
     }
 
     private static File findExecutable(String command) {
