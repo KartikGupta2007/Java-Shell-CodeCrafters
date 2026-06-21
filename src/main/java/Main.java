@@ -82,10 +82,20 @@ public class Main {
             }
             else if(commandName.equals("jobs")){
                 if (!BACKGROUND_JOBS.isEmpty()) {
+                    List<Job> completedJobs = new ArrayList<>();
                     for (int i = 0; i < BACKGROUND_JOBS.size(); i++) {
                         Job job = BACKGROUND_JOBS.get(i);
                         String marker = i == BACKGROUND_JOBS.size() - 1 ? "+" : i == BACKGROUND_JOBS.size() - 2 ? "-" : " ";
-                        writeOutput(job.format(marker) + System.lineSeparator(), redirectTarget, appendStdout);
+                        if (job.process.isAlive()) {
+                            writeOutput(job.format("Running", marker, true) + System.lineSeparator(), redirectTarget, appendStdout);
+                        } else {
+                            writeOutput(job.format("Done", marker, false) + System.lineSeparator(), redirectTarget, appendStdout);
+                            completedJobs.add(job);
+                        }
+                    }
+
+                    if (!completedJobs.isEmpty()) {
+                        BACKGROUND_JOBS.removeAll(completedJobs);
                     }
                 }
             }
@@ -121,8 +131,8 @@ public class Main {
 
                     Process process = processBuilder.start();
                     if (runInBackground) {
-                        String backgroundCommand = cmd.trim();
-                        Job job = new Job(nextJobNumber++, process.pid(), backgroundCommand);
+                        String backgroundCommand = String.join(" ", commandParts);
+                        Job job = new Job(nextJobNumber++, process.pid(), backgroundCommand, process);
                         BACKGROUND_JOBS.add(job);
                         System.out.println("[" + job.jobNumber + "] " + job.pid);
                     } else {
@@ -256,15 +266,17 @@ public class Main {
         private final int jobNumber;
         private final long pid;
         private final String command;
+        private final Process process;
 
-        private Job(int jobNumber, long pid, String command) {
+        private Job(int jobNumber, long pid, String command, Process process) {
             this.jobNumber = jobNumber;
             this.pid = pid;
             this.command = command;
+            this.process = process;
         }
 
-        private String format(String marker) {
-            return "[" + jobNumber + "]" + marker + "  " + String.format("%-24s", "Running") + command;
+        private String format(String status, String marker, boolean running) {
+            return "[" + jobNumber + "]" + marker + "  " + String.format("%-24s", status) + command + (running ? " &" : "");
         }
     }
 
