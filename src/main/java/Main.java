@@ -5,6 +5,8 @@ import java.nio.file.Path;
 
 public class Main {
     private static final Set<String> BUILTINS = Set.of("exit", "echo", "type", "pwd", "cd", "jobs");
+    private static final List<Job> BACKGROUND_JOBS = new ArrayList<>();
+    private static int nextJobNumber = 1;
 
     public static void main(String[] args) throws Exception {
         Scanner sc = new Scanner(System.in);
@@ -79,6 +81,11 @@ public class Main {
                 }
             }
             else if(commandName.equals("jobs")){
+                if (!BACKGROUND_JOBS.isEmpty()) {
+                    for (Job job : BACKGROUND_JOBS) {
+                        writeOutput(job.format() + System.lineSeparator(), redirectTarget, appendStdout);
+                    }
+                }
             }
             else {
                 File executable = findExecutable(commandName);
@@ -112,7 +119,9 @@ public class Main {
 
                     Process process = processBuilder.start();
                     if (runInBackground) {
-                        System.out.println("[1] " + process.pid());
+                        String backgroundCommand = cmd.trim();
+                        BACKGROUND_JOBS.add(new Job(nextJobNumber++, process.pid(), backgroundCommand));
+                        System.out.println("[" + BACKGROUND_JOBS.get(BACKGROUND_JOBS.size() - 1).jobNumber + "] " + process.pid());
                     } else {
                         process.waitFor();
                     }
@@ -237,6 +246,22 @@ public class Main {
             this.appendStdout = appendStdout;
             this.stderrRedirectTarget = stderrRedirectTarget;
             this.appendStderr = appendStderr;
+        }
+    }
+
+    private static class Job {
+        private final int jobNumber;
+        private final long pid;
+        private final String command;
+
+        private Job(int jobNumber, long pid, String command) {
+            this.jobNumber = jobNumber;
+            this.pid = pid;
+            this.command = command;
+        }
+
+        private String format() {
+            return "[" + jobNumber + "]+  " + String.format("%-24s", "Running") + command;
         }
     }
 
