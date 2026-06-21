@@ -6,7 +6,6 @@ import java.nio.file.Path;
 public class Main {
     private static final Set<String> BUILTINS = Set.of("exit", "echo", "type", "pwd", "cd", "jobs");
     private static final List<Job> BACKGROUND_JOBS = new ArrayList<>();
-    private static int nextJobNumber = 1;
 
     public static void main(String[] args) throws Exception {
         Scanner sc = new Scanner(System.in);
@@ -117,7 +116,7 @@ public class Main {
                     Process process = processBuilder.start();
                     if (runInBackground) {
                         String backgroundCommand = String.join(" ", commandParts);
-                        Job job = new Job(nextJobNumber++, process.pid(), backgroundCommand, process);
+                        Job job = new Job(nextJobNumber(), process.pid(), backgroundCommand, process);
                         BACKGROUND_JOBS.add(job);
                         System.out.println("[" + job.jobNumber + "] " + job.pid);
                     } else {
@@ -186,6 +185,21 @@ public class Main {
         if (!completedJobs.isEmpty()) {
             BACKGROUND_JOBS.removeAll(completedJobs);
         }
+    }
+
+    private static int nextJobNumber() {
+        if (BACKGROUND_JOBS.isEmpty()) {
+            return 1;
+        }
+
+        int highestJobNumber = 0;
+        for (Job job : BACKGROUND_JOBS) {
+            if (job.jobNumber > highestJobNumber) {
+                highestJobNumber = job.jobNumber;
+            }
+        }
+
+        return highestJobNumber + 1;
     }
 
     private static ParsedCommand parseCommand(String command) {
