@@ -84,24 +84,29 @@ public class Main {
                 File executable = findExecutable(commandName);
                 if (executable != null) {
                     ProcessBuilder processBuilder = new ProcessBuilder(commandParts)
-                            .directory(currentDirectory)
-                            .redirectError(ProcessBuilder.Redirect.INHERIT);
+                            .directory(currentDirectory);
 
-                    if (redirectTarget != null) {
-                        if (appendStdout) {
-                            processBuilder.redirectOutput(ProcessBuilder.Redirect.appendTo(new File(redirectTarget)));
-                        } else {
-                            processBuilder.redirectOutput(new File(redirectTarget));
-                        }
-                    } else {
+                    if (runInBackground) {
                         processBuilder.inheritIO();
-                    }
+                    } else {
+                        processBuilder.redirectError(ProcessBuilder.Redirect.INHERIT);
 
-                    if (stderrRedirectTarget != null) {
-                        if (appendStderr) {
-                            processBuilder.redirectError(ProcessBuilder.Redirect.appendTo(new File(stderrRedirectTarget)));
+                        if (redirectTarget != null) {
+                            if (appendStdout) {
+                                processBuilder.redirectOutput(ProcessBuilder.Redirect.appendTo(new File(redirectTarget)));
+                            } else {
+                                processBuilder.redirectOutput(new File(redirectTarget));
+                            }
                         } else {
-                            processBuilder.redirectError(new File(stderrRedirectTarget));
+                            processBuilder.inheritIO();
+                        }
+
+                        if (stderrRedirectTarget != null) {
+                            if (appendStderr) {
+                                processBuilder.redirectError(ProcessBuilder.Redirect.appendTo(new File(stderrRedirectTarget)));
+                            } else {
+                                processBuilder.redirectError(new File(stderrRedirectTarget));
+                            }
                         }
                     }
 
