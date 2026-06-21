@@ -4,7 +4,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 public class Main {
-    private static final Set<String> BUILTINS = Set.of("exit", "echo", "type", "pwd", "cd");
+    private static final Set<String> BUILTINS = Set.of("exit", "echo", "type", "pwd", "cd", "jobs");
 
     public static void main(String[] args) throws Exception {
         Scanner sc = new Scanner(System.in);
@@ -69,6 +69,8 @@ public class Main {
                         writeError(sub + ": not found" + System.lineSeparator(), stderrRedirectTarget, appendStderr);
                     }
                 }
+            }
+            else if(commandName.equals("jobs")){
             }
             else {
                 File executable = findExecutable(commandName);
@@ -236,3 +238,7 @@ public class Main {
         return null;
     }
 }
+
+
+// kartikgupta@Kartiks-Macbook-Air codecrafters-shell-java % echo $PATH
+// /Users/kartikgupta/Library/Application Support/Code/User/globalStorage/pleiades.java-extension-pack-jdk/java/25/bin:/Users/kartikgupta/Library/Application Support/Code/User/globalStorage/pleiades.java-extension-pack-jdk/gradle/latest/bin:/Users/kartikgupta/Library/Application Support/Code/User/globalStorage/pleiades.java-extension-pack-jdk/maven/latest/bin:/Users/kartikgupta/.antigravity/antigravity/bin:/Users/kartikgupta/.antigravity/antigravity/bin:/Users/kartikgupta/.antigravity/antigravity/bin:/Users/kartikgupta/.antigravity/antigravity/bin:/Users/kartikgupta/.bun/bin:/Users/kartikgupta/.antigravity/antigravity/bin:/opt/homebrew/opt/python@3.10/libexec/bin:/opt/homebrew/opt/openjdk@17/bin:/Users/kartikgupta/.codeium/windsurf/bin:/Users/kartikgupta/.nvm/versions/node/v24.11.0/bin:/opt/homebrew/opt/openjdk@21/bin:/opt/homebrew/Cellar/openjdk@17/17.0.17/libexec/openjdk.jdk/Contents/Home/bin:/opt/homebrew/opt/openjdk@21/bin:/Users/kartikgupta/.antigravity/antigravity/bin:/Users/kartikgupta/Library/Application Support/Code/User/globalStorage/github.copilot-chat/debugCommand:/Users/kartikgupta/Library/Application Support/Code/User/globalStorage/github.copilot-chat/copilotCli:/usr/bin:/bin:/usr/sbin:/sbin:/Users/kartikgupta/.vscode/extensions/vscjava.vscode-java-debug-0.59.0/bundled/scripts/noConfigScripts
