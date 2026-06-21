@@ -122,8 +122,9 @@ public class Main {
                     Process process = processBuilder.start();
                     if (runInBackground) {
                         String backgroundCommand = cmd.trim();
-                        BACKGROUND_JOBS.add(new Job(nextJobNumber++, process.pid(), backgroundCommand));
-                        System.out.println("[" + BACKGROUND_JOBS.get(BACKGROUND_JOBS.size() - 1).jobNumber + "] " + process.pid());
+                        Job job = new Job(nextJobNumber++, process.pid(), backgroundCommand);
+                        BACKGROUND_JOBS.add(job);
+                        System.out.println("[" + job.jobNumber + "] " + job.pid);
                     } else {
                         process.waitFor();
                     }
