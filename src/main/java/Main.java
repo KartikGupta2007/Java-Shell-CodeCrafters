@@ -43,8 +43,8 @@ public class Main {
                         ProcessBuilder rightProcessBuilder = new ProcessBuilder(rightCommand)
                                 .directory(currentDirectory)
                                 .redirectError(ProcessBuilder.Redirect.INHERIT)
-                                .redirectInput(ProcessBuilder.Redirect.PIPE)
-                                .inheritIO();
+                            .inheritIO()
+                            .redirectInput(ProcessBuilder.Redirect.PIPE);
 
                         List<Process> processes = ProcessBuilder.startPipeline(List.of(leftProcessBuilder, rightProcessBuilder));
                         for (Process process : processes) {
