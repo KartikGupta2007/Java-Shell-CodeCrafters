@@ -28,40 +28,20 @@ public class Main {
 
             int pipeIndex = commandParts.indexOf("|");
             if (pipeIndex != -1) {
-                List<String> leftCommand = new ArrayList<>(commandParts.subList(0, pipeIndex));
-                List<String> rightCommand = new ArrayList<>(commandParts.subList(pipeIndex + 1, commandParts.size()));
+                List<List<String>> pipelineStages = splitPipelineStages(commandParts);
 
-                if (!leftCommand.isEmpty() && !rightCommand.isEmpty()) {
-                    boolean leftBuiltin = BUILTINS.contains(leftCommand.get(0));
-                    boolean rightBuiltin = BUILTINS.contains(rightCommand.get(0));
+                if (pipelineStages.size() > 1) {
+                    String pipelineOutput;
 
-                    if (leftBuiltin || rightBuiltin) {
+                    if (pipelineContainsBuiltin(pipelineStages)) {
                         File[] currentDirectoryHolder = new File[] { currentDirectory };
-                        executeBuiltinPipeline(leftCommand, rightCommand, currentDirectoryHolder);
+                        pipelineOutput = executeBuiltinPipeline(pipelineStages, currentDirectoryHolder);
                         currentDirectory = currentDirectoryHolder[0];
                     } else {
-                        File leftExecutable = findExecutable(leftCommand.get(0));
-                        File rightExecutable = findExecutable(rightCommand.get(0));
-
-                        if (leftExecutable != null && rightExecutable != null) {
-                            ProcessBuilder leftProcessBuilder = new ProcessBuilder(leftCommand)
-                                    .directory(currentDirectory)
-                                    .redirectError(ProcessBuilder.Redirect.INHERIT)
-                                    .redirectOutput(ProcessBuilder.Redirect.PIPE);
-                            ProcessBuilder rightProcessBuilder = new ProcessBuilder(rightCommand)
-                                    .directory(currentDirectory)
-                                    .redirectError(ProcessBuilder.Redirect.INHERIT)
-                                    .inheritIO()
-                                    .redirectInput(ProcessBuilder.Redirect.PIPE);
-
-                            List<Process> processes = ProcessBuilder.startPipeline(List.of(leftProcessBuilder, rightProcessBuilder));
-                            for (Process process : processes) {
-                                process.waitFor();
-                            }
-                        } else {
-                            writeError(cmd + ": command not found" + System.lineSeparator(), parsedCommand.stderrRedirectTarget, parsedCommand.appendStderr);
-                        }
+                        pipelineOutput = executeExternalPipeline(pipelineStages, currentDirectory);
                     }
+
+                    writeOutput(pipelineOutput, redirectTarget, appendStdout);
                 }
 
                 continue;
@@ -228,47 +208,61 @@ public class Main {
         }
     }
 
-    private static void executeBuiltinPipeline(List<String> leftCommand, List<String> rightCommand, File[] currentDirectoryHolder) throws Exception {
-        boolean leftBuiltin = BUILTINS.contains(leftCommand.get(0));
-        boolean rightBuiltin = BUILTINS.contains(rightCommand.get(0));
+    private static List<List<String>> splitPipelineStages(List<String> commandParts) {
+        List<List<String>> stages = new ArrayList<>();
+        List<String> currentStage = new ArrayList<>();
 
-        if (leftBuiltin && rightBuiltin) {
-            executeBuiltinForPipeline(leftCommand, currentDirectoryHolder);
-            String rightOutput = executeBuiltinForPipeline(rightCommand, currentDirectoryHolder);
-            if (!rightOutput.isEmpty()) {
-                System.out.print(rightOutput);
-            }
-            return;
-        }
-
-        if (leftBuiltin) {
-            String leftOutput = executeBuiltinForPipeline(leftCommand, currentDirectoryHolder);
-            if (rightBuiltin) {
-                String rightOutput = executeBuiltinForPipeline(rightCommand, currentDirectoryHolder);
-                if (!rightOutput.isEmpty()) {
-                    System.out.print(rightOutput);
+        for (String part : commandParts) {
+            if (part.equals("|")) {
+                if (!currentStage.isEmpty()) {
+                    stages.add(currentStage);
+                    currentStage = new ArrayList<>();
                 }
             } else {
-                executeExternalCommandWithInput(rightCommand, currentDirectoryHolder[0], leftOutput);
+                currentStage.add(part);
             }
-            return;
         }
 
-        if (rightBuiltin) {
-            executeExternalCommandWithDiscardedOutput(leftCommand, currentDirectoryHolder[0]);
-            String rightOutput = executeBuiltinForPipeline(rightCommand, currentDirectoryHolder);
-            if (!rightOutput.isEmpty()) {
-                System.out.print(rightOutput);
-            }
+        if (!currentStage.isEmpty()) {
+            stages.add(currentStage);
         }
+
+        return stages;
     }
 
-    private static String executeBuiltinForPipeline(List<String> commandParts, File[] currentDirectoryHolder) throws Exception {
+    private static boolean pipelineContainsBuiltin(List<List<String>> stages) {
+        for (List<String> stage : stages) {
+            if (!stage.isEmpty() && BUILTINS.contains(stage.get(0))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static String executePipelineWithBuiltins(List<List<String>> stages, File[] currentDirectoryHolder) throws Exception {
+        String currentInput = "";
+
+        for (List<String> stage : stages) {
+            if (stage.isEmpty()) {
+                continue;
+            }
+
+            if (BUILTINS.contains(stage.get(0))) {
+                currentInput = executeBuiltinStage(stage, currentDirectoryHolder, currentInput);
+            } else {
+                currentInput = executeExternalStage(stage, currentDirectoryHolder[0], currentInput);
+            }
+        }
+
+        return currentInput;
+    }
+
+    private static String executeBuiltinStage(List<String> commandParts, File[] currentDirectoryHolder, String input) throws Exception {
         String commandName = commandParts.get(0);
 
         if (commandName.equals("echo")) {
-            String output = String.join(" ", commandParts.subList(1, commandParts.size())) + System.lineSeparator();
-            return output;
+            return String.join(" ", commandParts.subList(1, commandParts.size())) + System.lineSeparator();
         }
 
         if (commandName.equals("pwd")) {
@@ -308,27 +302,32 @@ public class Main {
         }
 
         if (commandName.equals("jobs")) {
-            java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+            StringBuilder output = new StringBuilder();
             List<String> lines = buildJobLines(true);
             for (String line : lines) {
-                output.write((line + System.lineSeparator()).getBytes());
+                output.append(line).append(System.lineSeparator());
             }
             return output.toString();
         }
 
-        return "";
+        if (commandName.equals("exit") && (commandParts.size() == 1 || commandParts.get(1).equals("0"))) {
+            return "";
+        }
+
+        return input;
     }
 
-    private static void executeExternalCommandWithInput(List<String> commandParts, File currentDirectory, String input) throws Exception {
+    private static String executeExternalStage(List<String> commandParts, File currentDirectory, String input) throws Exception {
         File executable = findExecutable(commandParts.get(0));
         if (executable == null) {
-            return;
+            writeError(commandParts.get(0) + ": command not found" + System.lineSeparator(), null, false);
+            return "";
         }
 
         Process process = new ProcessBuilder(commandParts)
                 .directory(currentDirectory)
                 .redirectError(ProcessBuilder.Redirect.INHERIT)
-                .redirectOutput(ProcessBuilder.Redirect.INHERIT)
+                .redirectOutput(ProcessBuilder.Redirect.PIPE)
                 .redirectInput(ProcessBuilder.Redirect.PIPE)
                 .start();
 
@@ -336,30 +335,43 @@ public class Main {
             processInput.write(input.getBytes());
         }
 
+        byte[] outputBytes = process.getInputStream().readAllBytes();
         process.waitFor();
+        return new String(outputBytes);
     }
 
-    private static void executeExternalCommandWithDiscardedOutput(List<String> commandParts, File currentDirectory) throws Exception {
-        File executable = findExecutable(commandParts.get(0));
-        if (executable == null) {
-            return;
+    private static String executeExternalPipeline(List<List<String>> stages, File currentDirectory) throws Exception {
+        List<ProcessBuilder> processBuilders = new ArrayList<>();
+
+        for (int i = 0; i < stages.size(); i++) {
+            List<String> stage = stages.get(i);
+            File executable = findExecutable(stage.get(0));
+            if (executable == null) {
+                writeError(stage.get(0) + ": command not found" + System.lineSeparator(), null, false);
+                return "";
+            }
+
+            ProcessBuilder processBuilder = new ProcessBuilder(stage)
+                    .directory(currentDirectory)
+                    .redirectError(ProcessBuilder.Redirect.INHERIT)
+                    .redirectOutput(ProcessBuilder.Redirect.PIPE);
+
+            if (i > 0) {
+                processBuilder.redirectInput(ProcessBuilder.Redirect.PIPE);
+            }
+
+            processBuilders.add(processBuilder);
         }
 
-        Process process = new ProcessBuilder(commandParts)
-                .directory(currentDirectory)
-                .redirectError(ProcessBuilder.Redirect.INHERIT)
-                .redirectOutput(ProcessBuilder.Redirect.PIPE)
-                .start();
+        List<Process> processes = ProcessBuilder.startPipeline(processBuilders);
+        Process lastProcess = processes.get(processes.size() - 1);
+        byte[] outputBytes = lastProcess.getInputStream().readAllBytes();
 
-        Thread drainer = new Thread(() -> {
-            try (java.io.InputStream inputStream = process.getInputStream()) {
-                inputStream.transferTo(java.io.OutputStream.nullOutputStream());
-            } catch (Exception ignored) {
-            }
-        });
-        drainer.start();
-        process.waitFor();
-        drainer.join();
+        for (Process process : processes) {
+            process.waitFor();
+        }
+
+        return new String(outputBytes);
     }
 
     private static List<String> buildJobLines(boolean includeRunningJobs) {
@@ -530,4 +542,3 @@ public class Main {
         return null;
     }
 }
-
