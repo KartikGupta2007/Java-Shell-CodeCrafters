@@ -26,6 +26,31 @@ public class Main {
                 continue;
             }
 
+            int pipeIndex = commandParts.indexOf("|");
+            if (pipeIndex != -1) {
+                List<String> leftCommand = new ArrayList<>(commandParts.subList(0, pipeIndex));
+                List<String> rightCommand = new ArrayList<>(commandParts.subList(pipeIndex + 1, commandParts.size()));
+
+                if (!leftCommand.isEmpty() && !rightCommand.isEmpty()) {
+                    File leftExecutable = findExecutable(leftCommand.get(0));
+                    File rightExecutable = findExecutable(rightCommand.get(0));
+
+                    if (leftExecutable != null && rightExecutable != null) {
+                        ProcessBuilder leftProcessBuilder = new ProcessBuilder(leftCommand).directory(currentDirectory).redirectError(ProcessBuilder.Redirect.INHERIT);
+                        ProcessBuilder rightProcessBuilder = new ProcessBuilder(rightCommand).directory(currentDirectory).redirectError(ProcessBuilder.Redirect.INHERIT).inheritIO();
+
+                        List<Process> processes = ProcessBuilder.startPipeline(List.of(leftProcessBuilder, rightProcessBuilder));
+                        for (Process process : processes) {
+                            process.waitFor();
+                        }
+                    } else {
+                        writeError(cmd + ": command not found" + System.lineSeparator(), parsedCommand.stderrRedirectTarget, parsedCommand.appendStderr);
+                    }
+                }
+
+                continue;
+            }
+
             String commandName = commandParts.get(0);
             String redirectTarget = parsedCommand.stdoutRedirectTarget;
             boolean appendStdout = parsedCommand.appendStdout;
