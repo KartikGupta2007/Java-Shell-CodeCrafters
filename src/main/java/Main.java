@@ -29,6 +29,14 @@ public class Main {
             boolean appendStdout = parsedCommand.appendStdout;
             String stderrRedirectTarget = parsedCommand.stderrRedirectTarget;
             boolean appendStderr = parsedCommand.appendStderr;
+            boolean runInBackground = commandParts.size() > 0 && commandParts.get(commandParts.size() - 1).equals("&");
+            if (runInBackground) {
+                commandParts = new ArrayList<>(commandParts.subList(0, commandParts.size() - 1));
+                if (commandParts.isEmpty()) {
+                    continue;
+                }
+                commandName = commandParts.get(0);
+            }
 
             prepareRedirectTarget(redirectTarget, appendStdout);
             prepareRedirectTarget(stderrRedirectTarget, appendStderr);
@@ -98,7 +106,11 @@ public class Main {
                     }
 
                     Process process = processBuilder.start();
-                    process.waitFor();
+                    if (runInBackground) {
+                        System.out.println("[1] " + process.pid());
+                    } else {
+                        process.waitFor();
+                    }
                 } else {
                     writeError(cmd + ": command not found" + System.lineSeparator(), stderrRedirectTarget, appendStderr);
                 }
@@ -189,7 +201,9 @@ public class Main {
 
         for (int i = 0; i < args.size(); i++) {
             String arg = args.get(i);
-            if ((arg.equals(">") || arg.equals("1>") || arg.equals(">>") || arg.equals("1>>")) && i + 1 < args.size()) {
+            if (arg.equals("&") && i == args.size() - 1) {
+                filteredArgs.add(arg);
+            } else if ((arg.equals(">") || arg.equals("1>") || arg.equals(">>") || arg.equals("1>>")) && i + 1 < args.size()) {
                 redirectTarget = args.get(i + 1);
                 appendStdout = arg.contains(">>");
                 i++;
@@ -239,6 +253,3 @@ public class Main {
     }
 }
 
-
-// kartikgupta@Kartiks-Macbook-Air codecrafters-shell-java % echo $PATH
-// /Users/kartikgupta/Library/Application Support/Code/User/globalStorage/pleiades.java-extension-pack-jdk/java/25/bin:/Users/kartikgupta/Library/Application Support/Code/User/globalStorage/pleiades.java-extension-pack-jdk/gradle/latest/bin:/Users/kartikgupta/Library/Application Support/Code/User/globalStorage/pleiades.java-extension-pack-jdk/maven/latest/bin:/Users/kartikgupta/.antigravity/antigravity/bin:/Users/kartikgupta/.antigravity/antigravity/bin:/Users/kartikgupta/.antigravity/antigravity/bin:/Users/kartikgupta/.antigravity/antigravity/bin:/Users/kartikgupta/.bun/bin:/Users/kartikgupta/.antigravity/antigravity/bin:/opt/homebrew/opt/python@3.10/libexec/bin:/opt/homebrew/opt/openjdk@17/bin:/Users/kartikgupta/.codeium/windsurf/bin:/Users/kartikgupta/.nvm/versions/node/v24.11.0/bin:/opt/homebrew/opt/openjdk@21/bin:/opt/homebrew/Cellar/openjdk@17/17.0.17/libexec/openjdk.jdk/Contents/Home/bin:/opt/homebrew/opt/openjdk@21/bin:/Users/kartikgupta/.antigravity/antigravity/bin:/Users/kartikgupta/Library/Application Support/Code/User/globalStorage/github.copilot-chat/debugCommand:/Users/kartikgupta/Library/Application Support/Code/User/globalStorage/github.copilot-chat/copilotCli:/usr/bin:/bin:/usr/sbin:/sbin:/Users/kartikgupta/.vscode/extensions/vscjava.vscode-java-debug-0.59.0/bundled/scripts/noConfigScripts
