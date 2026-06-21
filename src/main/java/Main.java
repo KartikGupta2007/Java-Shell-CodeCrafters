@@ -36,7 +36,9 @@ public class Main {
                     boolean rightBuiltin = BUILTINS.contains(rightCommand.get(0));
 
                     if (leftBuiltin || rightBuiltin) {
-                        executeBuiltinPipeline(leftCommand, rightCommand, currentDirectory);
+                        File[] currentDirectoryHolder = new File[] { currentDirectory };
+                        executeBuiltinPipeline(leftCommand, rightCommand, currentDirectoryHolder);
+                        currentDirectory = currentDirectoryHolder[0];
                     } else {
                         File leftExecutable = findExecutable(leftCommand.get(0));
                         File rightExecutable = findExecutable(rightCommand.get(0));
@@ -226,8 +228,7 @@ public class Main {
         }
     }
 
-    private static void executeBuiltinPipeline(List<String> leftCommand, List<String> rightCommand, File currentDirectory) throws Exception {
-        File[] currentDirectoryHolder = new File[] { currentDirectory };
+    private static void executeBuiltinPipeline(List<String> leftCommand, List<String> rightCommand, File[] currentDirectoryHolder) throws Exception {
         boolean leftBuiltin = BUILTINS.contains(leftCommand.get(0));
         boolean rightBuiltin = BUILTINS.contains(rightCommand.get(0));
 
@@ -258,7 +259,6 @@ public class Main {
 
         if (commandName.equals("echo")) {
             String output = String.join(" ", commandParts.subList(1, commandParts.size())) + System.lineSeparator();
-            System.out.print("");
             return output;
         }
 
