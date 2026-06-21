@@ -26,6 +26,11 @@ public class Main {
                 continue;
             }
 
+            String redirectTarget = parsedCommand.stdoutRedirectTarget;
+            boolean appendStdout = parsedCommand.appendStdout;
+            String stderrRedirectTarget = parsedCommand.stderrRedirectTarget;
+            boolean appendStderr = parsedCommand.appendStderr;
+
             int pipeIndex = commandParts.indexOf("|");
             if (pipeIndex != -1) {
                 List<List<String>> pipelineStages = splitPipelineStages(commandParts);
@@ -35,7 +40,7 @@ public class Main {
 
                     if (pipelineContainsBuiltin(pipelineStages)) {
                         File[] currentDirectoryHolder = new File[] { currentDirectory };
-                        pipelineOutput = executeBuiltinPipeline(pipelineStages, currentDirectoryHolder);
+                        pipelineOutput = executePipelineWithBuiltins(pipelineStages, currentDirectoryHolder);
                         currentDirectory = currentDirectoryHolder[0];
                     } else {
                         pipelineOutput = executeExternalPipeline(pipelineStages, currentDirectory);
@@ -48,10 +53,6 @@ public class Main {
             }
 
             String commandName = commandParts.get(0);
-            String redirectTarget = parsedCommand.stdoutRedirectTarget;
-            boolean appendStdout = parsedCommand.appendStdout;
-            String stderrRedirectTarget = parsedCommand.stderrRedirectTarget;
-            boolean appendStderr = parsedCommand.appendStderr;
             boolean runInBackground = commandParts.size() > 0 && commandParts.get(commandParts.size() - 1).equals("&");
             if (runInBackground) {
                 commandParts = new ArrayList<>(commandParts.subList(0, commandParts.size() - 1));
@@ -449,6 +450,13 @@ public class Main {
                 currentArg.append(command.charAt(i + 1));
                 hasCurrentArg = true;
                 i++;
+            } else if (currentChar == '|' && !inSingleQuotes && !inDoubleQuotes) {
+                if (hasCurrentArg) {
+                    args.add(currentArg.toString());
+                    currentArg.setLength(0);
+                    hasCurrentArg = false;
+                }
+                args.add("|");
             } else if (Character.isWhitespace(currentChar) && !inSingleQuotes && !inDoubleQuotes) {
                 if (hasCurrentArg) {
                     args.add(currentArg.toString());
