@@ -234,14 +234,20 @@ public class Main {
 
         if (leftBuiltin && rightBuiltin) {
             executeBuiltinForPipeline(leftCommand, currentDirectoryHolder);
-            executeBuiltinForPipeline(rightCommand, currentDirectoryHolder);
+            String rightOutput = executeBuiltinForPipeline(rightCommand, currentDirectoryHolder);
+            if (!rightOutput.isEmpty()) {
+                System.out.print(rightOutput);
+            }
             return;
         }
 
         if (leftBuiltin) {
             String leftOutput = executeBuiltinForPipeline(leftCommand, currentDirectoryHolder);
             if (rightBuiltin) {
-                executeBuiltinForPipeline(rightCommand, currentDirectoryHolder);
+                String rightOutput = executeBuiltinForPipeline(rightCommand, currentDirectoryHolder);
+                if (!rightOutput.isEmpty()) {
+                    System.out.print(rightOutput);
+                }
             } else {
                 executeExternalCommandWithInput(rightCommand, currentDirectoryHolder[0], leftOutput);
             }
@@ -250,7 +256,10 @@ public class Main {
 
         if (rightBuiltin) {
             executeExternalCommandWithDiscardedOutput(leftCommand, currentDirectoryHolder[0]);
-            executeBuiltinForPipeline(rightCommand, currentDirectoryHolder);
+            String rightOutput = executeBuiltinForPipeline(rightCommand, currentDirectoryHolder);
+            if (!rightOutput.isEmpty()) {
+                System.out.print(rightOutput);
+            }
         }
     }
 
