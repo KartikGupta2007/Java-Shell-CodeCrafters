@@ -36,8 +36,15 @@ public class Main {
                     File rightExecutable = findExecutable(rightCommand.get(0));
 
                     if (leftExecutable != null && rightExecutable != null) {
-                        ProcessBuilder leftProcessBuilder = new ProcessBuilder(leftCommand).directory(currentDirectory).redirectError(ProcessBuilder.Redirect.INHERIT);
-                        ProcessBuilder rightProcessBuilder = new ProcessBuilder(rightCommand).directory(currentDirectory).redirectError(ProcessBuilder.Redirect.INHERIT).inheritIO();
+                        ProcessBuilder leftProcessBuilder = new ProcessBuilder(leftCommand)
+                                .directory(currentDirectory)
+                                .redirectError(ProcessBuilder.Redirect.INHERIT)
+                                .redirectOutput(ProcessBuilder.Redirect.PIPE);
+                        ProcessBuilder rightProcessBuilder = new ProcessBuilder(rightCommand)
+                                .directory(currentDirectory)
+                                .redirectError(ProcessBuilder.Redirect.INHERIT)
+                                .redirectInput(ProcessBuilder.Redirect.PIPE)
+                                .inheritIO();
 
                         List<Process> processes = ProcessBuilder.startPipeline(List.of(leftProcessBuilder, rightProcessBuilder));
                         for (Process process : processes) {
