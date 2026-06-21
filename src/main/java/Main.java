@@ -36,17 +36,14 @@ public class Main {
                 List<List<String>> pipelineStages = splitPipelineStages(commandParts);
 
                 if (pipelineStages.size() > 1) {
-                    String pipelineOutput;
-
                     if (pipelineContainsBuiltin(pipelineStages)) {
                         File[] currentDirectoryHolder = new File[] { currentDirectory };
-                        pipelineOutput = executePipelineWithBuiltins(pipelineStages, currentDirectoryHolder);
+                        String pipelineOutput = executePipelineWithBuiltins(pipelineStages, currentDirectoryHolder);
                         currentDirectory = currentDirectoryHolder[0];
+                        writeOutput(pipelineOutput, redirectTarget, appendStdout);
                     } else {
-                        pipelineOutput = executeExternalPipeline(pipelineStages, currentDirectory);
+                        executeExternalPipeline(pipelineStages, currentDirectory);
                     }
-
-                    writeOutput(pipelineOutput, redirectTarget, appendStdout);
                 }
 
                 continue;
@@ -341,7 +338,7 @@ public class Main {
         return new String(outputBytes);
     }
 
-    private static String executeExternalPipeline(List<List<String>> stages, File currentDirectory) throws Exception {
+    private static void executeExternalPipeline(List<List<String>> stages, File currentDirectory) throws Exception {
         List<ProcessBuilder> processBuilders = new ArrayList<>();
 
         for (int i = 0; i < stages.size(); i++) {
@@ -349,7 +346,7 @@ public class Main {
             File executable = findExecutable(stage.get(0));
             if (executable == null) {
                 writeError(stage.get(0) + ": command not found" + System.lineSeparator(), null, false);
-                return "";
+                return;
             }
 
             ProcessBuilder processBuilder = new ProcessBuilder(stage)
@@ -366,13 +363,25 @@ public class Main {
 
         List<Process> processes = ProcessBuilder.startPipeline(processBuilders);
         Process lastProcess = processes.get(processes.size() - 1);
-        byte[] outputBytes = lastProcess.getInputStream().readAllBytes();
+
+        Thread outputThread = new Thread(() -> {
+            try (java.io.InputStream inputStream = lastProcess.getInputStream()) {
+                byte[] buffer = new byte[8192];
+                int bytesRead;
+                while ((bytesRead = inputStream.read(buffer)) != -1) {
+                    System.out.write(buffer, 0, bytesRead);
+                    System.out.flush();
+                }
+            } catch (Exception ignored) {
+            }
+        });
+        outputThread.start();
 
         for (Process process : processes) {
             process.waitFor();
         }
 
-        return new String(outputBytes);
+        outputThread.join();
     }
 
     private static List<String> buildJobLines(boolean includeRunningJobs) {
