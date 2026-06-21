@@ -1,34 +1,85 @@
-[![progress-banner](https://backend.codecrafters.io/progress/shell/b8b454fd-96e4-41ba-9542-c4769d9daba3)](https://app.codecrafters.io/users/KartikGupta2007?r=2qF)
+# Java Shell
 
-This is a starting point for Java solutions to the
-["Build Your Own Shell" Challenge](https://app.codecrafters.io/courses/shell/overview).
+A small shell implementation written in Java for the Codecrafters "Build Your Own Shell" challenge.
 
-In this challenge, you'll build your own POSIX compliant shell that's capable of
-interpreting shell commands, running external programs and builtin commands like
-cd, pwd, echo and more. Along the way, you'll learn about shell command parsing,
-REPLs, builtin commands, and more.
+The goal of the project is to mimic a subset of POSIX shell behavior closely enough to run the challenge test suite. The shell reads commands from standard input, parses them, executes builtins or external programs, and supports job control and pipelines.
 
-**Note**: If you're viewing this repo on GitHub, head over to
-[codecrafters.io](https://codecrafters.io) to try the challenge.
+## Features
 
-# Passing the first stage
+- Builtins: `exit`, `echo`, `type`, `pwd`, `cd`, `jobs`
+- Background execution with `&`
+- Automatic reaping of completed background jobs before each prompt
+- `jobs` output with `Running` and `Done` states
+- Job number recycling when finished jobs are removed
+- Pipelines with two or more stages
+- Pipelines that mix builtins and external commands
+- Command parsing with quoting and basic redirection support
 
-The entry point for your `shell` implementation is in `src/main/java/Main.java`.
-Study and uncomment the relevant code, then run the command below to execute the
-tests on our servers:
+## Examples
 
 ```sh
-codecrafters submit
+$ echo hello
+hello
+
+$ pwd
+/Users/you/code/codecrafters-shell-java
+
+$ sleep 10 &
+[1] 84470
+
+$ jobs
+[1]+  Running                 sleep 10 &
+
+$ echo orange | wc
+	1       1      7
+
+$ ls | type exit
+exit is a shell builtin
 ```
 
-Time to move on to the next stage!
+## Running Locally
 
-# Stage 2 & beyond
+```sh
+./your_program.sh
+```
 
-Note: This section is for stages 2 and beyond.
+If you want to compile the Java source directly:
 
-1. Ensure you have `mvn` installed locally
-1. Run `./your_program.sh` to run your program, which is implemented in
-   `src/main/java/Main.java`.
-1. Run `codecrafters submit` to submit your solution to CodeCrafters. Test
-   output will be streamed to your terminal.
+```sh
+mvn -q -DskipTests compile
+```
+
+## Project Structure
+
+- `src/main/java/Main.java` - shell implementation and command dispatch
+- `your_program.sh` - launch script used by Codecrafters
+- `pom.xml` - Maven build configuration
+
+## Development Notes
+
+- The shell is implemented as a single interactive loop in `Main.java`.
+- Background jobs are stored in memory and reaped both before each prompt and when `jobs` is executed.
+- Pipelines are handled stage-by-stage, with builtins executed in-process when they appear anywhere in the chain.
+
+## Publishing to GitHub
+
+To publish this repository to GitHub:
+
+1. Create a new empty repository on GitHub.
+2. Add it as a remote:
+
+```sh
+git remote add origin https://github.com/<your-username>/<your-repo>.git
+```
+
+3. Push the current branch:
+
+```sh
+git push -u origin master
+```
+
+If your default branch is `main`, push that branch instead.
+
+## Notes
+
+This repository was built stage-by-stage for Codecrafters, so the implementation focuses on the behaviors required by the challenge tests rather than full shell compatibility.
