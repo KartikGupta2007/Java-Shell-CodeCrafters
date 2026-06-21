@@ -13,6 +13,7 @@ public class Main {
         File currentDirectory = new File(System.getProperty("user.dir"));
 
         while (true) {
+            renderBackgroundJobs(false, null, false);
             System.out.print("$ ");
             String cmd = sc.nextLine();
 
@@ -81,23 +82,7 @@ public class Main {
                 }
             }
             else if(commandName.equals("jobs")){
-                if (!BACKGROUND_JOBS.isEmpty()) {
-                    List<Job> completedJobs = new ArrayList<>();
-                    for (int i = 0; i < BACKGROUND_JOBS.size(); i++) {
-                        Job job = BACKGROUND_JOBS.get(i);
-                        String marker = i == BACKGROUND_JOBS.size() - 1 ? "+" : i == BACKGROUND_JOBS.size() - 2 ? "-" : " ";
-                        if (job.process.isAlive()) {
-                            writeOutput(job.format("Running", marker, true) + System.lineSeparator(), redirectTarget, appendStdout);
-                        } else {
-                            writeOutput(job.format("Done", marker, false) + System.lineSeparator(), redirectTarget, appendStdout);
-                            completedJobs.add(job);
-                        }
-                    }
-
-                    if (!completedJobs.isEmpty()) {
-                        BACKGROUND_JOBS.removeAll(completedJobs);
-                    }
-                }
+                renderBackgroundJobs(true, redirectTarget, appendStdout);
             }
             else {
                 File executable = findExecutable(commandName);
@@ -172,6 +157,34 @@ public class Main {
             }
         } else {
             System.err.print(output);
+        }
+    }
+
+    private static void renderBackgroundJobs(boolean includeRunningJobs, String redirectTarget, boolean append) throws Exception {
+        if (BACKGROUND_JOBS.isEmpty()) {
+            return;
+        }
+
+        List<Job> completedJobs = new ArrayList<>();
+        int jobCount = BACKGROUND_JOBS.size();
+
+        for (int i = 0; i < jobCount; i++) {
+            Job job = BACKGROUND_JOBS.get(i);
+            String marker = i == jobCount - 1 ? "+" : i == jobCount - 2 ? "-" : " ";
+            boolean running = job.process.isAlive();
+
+            if (running) {
+                if (includeRunningJobs) {
+                    writeOutput(job.format("Running", marker, true) + System.lineSeparator(), redirectTarget, append);
+                }
+            } else {
+                writeOutput(job.format("Done", marker, false) + System.lineSeparator(), redirectTarget, append);
+                completedJobs.add(job);
+            }
+        }
+
+        if (!completedJobs.isEmpty()) {
+            BACKGROUND_JOBS.removeAll(completedJobs);
         }
     }
 
