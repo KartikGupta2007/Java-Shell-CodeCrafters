@@ -82,8 +82,10 @@ public class Main {
             }
             else if(commandName.equals("jobs")){
                 if (!BACKGROUND_JOBS.isEmpty()) {
-                    for (Job job : BACKGROUND_JOBS) {
-                        writeOutput(job.format() + System.lineSeparator(), redirectTarget, appendStdout);
+                    for (int i = 0; i < BACKGROUND_JOBS.size(); i++) {
+                        Job job = BACKGROUND_JOBS.get(i);
+                        String marker = i == BACKGROUND_JOBS.size() - 1 ? "+" : i == BACKGROUND_JOBS.size() - 2 ? "-" : " ";
+                        writeOutput(job.format(marker) + System.lineSeparator(), redirectTarget, appendStdout);
                     }
                 }
             }
@@ -260,8 +262,8 @@ public class Main {
             this.command = command;
         }
 
-        private String format() {
-            return "[" + jobNumber + "]+  " + String.format("%-24s", "Running") + command;
+        private String format(String marker) {
+            return "[" + jobNumber + "]" + marker + "  " + String.format("%-24s", "Running") + command;
         }
     }
 
