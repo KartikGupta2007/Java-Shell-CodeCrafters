@@ -32,26 +32,33 @@ public class Main {
                 List<String> rightCommand = new ArrayList<>(commandParts.subList(pipeIndex + 1, commandParts.size()));
 
                 if (!leftCommand.isEmpty() && !rightCommand.isEmpty()) {
-                    File leftExecutable = findExecutable(leftCommand.get(0));
-                    File rightExecutable = findExecutable(rightCommand.get(0));
+                    boolean leftBuiltin = BUILTINS.contains(leftCommand.get(0));
+                    boolean rightBuiltin = BUILTINS.contains(rightCommand.get(0));
 
-                    if (leftExecutable != null && rightExecutable != null) {
-                        ProcessBuilder leftProcessBuilder = new ProcessBuilder(leftCommand)
-                                .directory(currentDirectory)
-                                .redirectError(ProcessBuilder.Redirect.INHERIT)
-                                .redirectOutput(ProcessBuilder.Redirect.PIPE);
-                        ProcessBuilder rightProcessBuilder = new ProcessBuilder(rightCommand)
-                                .directory(currentDirectory)
-                                .redirectError(ProcessBuilder.Redirect.INHERIT)
-                            .inheritIO()
-                            .redirectInput(ProcessBuilder.Redirect.PIPE);
-
-                        List<Process> processes = ProcessBuilder.startPipeline(List.of(leftProcessBuilder, rightProcessBuilder));
-                        for (Process process : processes) {
-                            process.waitFor();
-                        }
+                    if (leftBuiltin || rightBuiltin) {
+                        executeBuiltinPipeline(leftCommand, rightCommand, currentDirectory);
                     } else {
-                        writeError(cmd + ": command not found" + System.lineSeparator(), parsedCommand.stderrRedirectTarget, parsedCommand.appendStderr);
+                        File leftExecutable = findExecutable(leftCommand.get(0));
+                        File rightExecutable = findExecutable(rightCommand.get(0));
+
+                        if (leftExecutable != null && rightExecutable != null) {
+                            ProcessBuilder leftProcessBuilder = new ProcessBuilder(leftCommand)
+                                    .directory(currentDirectory)
+                                    .redirectError(ProcessBuilder.Redirect.INHERIT)
+                                    .redirectOutput(ProcessBuilder.Redirect.PIPE);
+                            ProcessBuilder rightProcessBuilder = new ProcessBuilder(rightCommand)
+                                    .directory(currentDirectory)
+                                    .redirectError(ProcessBuilder.Redirect.INHERIT)
+                                    .inheritIO()
+                                    .redirectInput(ProcessBuilder.Redirect.PIPE);
+
+                            List<Process> processes = ProcessBuilder.startPipeline(List.of(leftProcessBuilder, rightProcessBuilder));
+                            for (Process process : processes) {
+                                process.waitFor();
+                            }
+                        } else {
+                            writeError(cmd + ": command not found" + System.lineSeparator(), parsedCommand.stderrRedirectTarget, parsedCommand.appendStderr);
+                        }
                     }
                 }
 
@@ -217,6 +224,164 @@ public class Main {
         if (!completedJobs.isEmpty()) {
             BACKGROUND_JOBS.removeAll(completedJobs);
         }
+    }
+
+    private static void executeBuiltinPipeline(List<String> leftCommand, List<String> rightCommand, File currentDirectory) throws Exception {
+        File[] currentDirectoryHolder = new File[] { currentDirectory };
+        boolean leftBuiltin = BUILTINS.contains(leftCommand.get(0));
+        boolean rightBuiltin = BUILTINS.contains(rightCommand.get(0));
+
+        if (leftBuiltin && rightBuiltin) {
+            executeBuiltinForPipeline(leftCommand, currentDirectoryHolder);
+            executeBuiltinForPipeline(rightCommand, currentDirectoryHolder);
+            return;
+        }
+
+        if (leftBuiltin) {
+            String leftOutput = executeBuiltinForPipeline(leftCommand, currentDirectoryHolder);
+            if (rightBuiltin) {
+                executeBuiltinForPipeline(rightCommand, currentDirectoryHolder);
+            } else {
+                executeExternalCommandWithInput(rightCommand, currentDirectoryHolder[0], leftOutput);
+            }
+            return;
+        }
+
+        if (rightBuiltin) {
+            executeExternalCommandWithDiscardedOutput(leftCommand, currentDirectoryHolder[0]);
+            executeBuiltinForPipeline(rightCommand, currentDirectoryHolder);
+        }
+    }
+
+    private static String executeBuiltinForPipeline(List<String> commandParts, File[] currentDirectoryHolder) throws Exception {
+        String commandName = commandParts.get(0);
+
+        if (commandName.equals("echo")) {
+            String output = String.join(" ", commandParts.subList(1, commandParts.size())) + System.lineSeparator();
+            System.out.print("");
+            return output;
+        }
+
+        if (commandName.equals("pwd")) {
+            return currentDirectoryHolder[0].getAbsolutePath() + System.lineSeparator();
+        }
+
+        if (commandName.equals("type") && commandParts.size() > 1) {
+            String sub = commandParts.get(1);
+            if (BUILTINS.contains(sub)) {
+                return sub + " is a shell builtin" + System.lineSeparator();
+            }
+
+            File executable = findExecutable(sub);
+            if (executable != null) {
+                return sub + " is " + executable.getAbsolutePath() + System.lineSeparator();
+            }
+
+            writeError(sub + ": not found" + System.lineSeparator(), null, false);
+            return "";
+        }
+
+        if (commandName.equals("cd") && commandParts.size() > 1) {
+            String directory = commandParts.get(1);
+            String targetDirectory = directory.equals("~") ? System.getenv("HOME") : directory;
+            File newDirectory = targetDirectory == null ? null : new File(targetDirectory);
+            if (newDirectory != null && !newDirectory.isAbsolute()) {
+                newDirectory = new File(currentDirectoryHolder[0], directory);
+            }
+
+            if (newDirectory != null && newDirectory.isDirectory()) {
+                currentDirectoryHolder[0] = newDirectory.getCanonicalFile();
+            } else {
+                writeError("cd: " + directory + ": No such file or directory" + System.lineSeparator(), null, false);
+            }
+
+            return "";
+        }
+
+        if (commandName.equals("jobs")) {
+            java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+            List<String> lines = buildJobLines(true);
+            for (String line : lines) {
+                output.write((line + System.lineSeparator()).getBytes());
+            }
+            return output.toString();
+        }
+
+        return "";
+    }
+
+    private static void executeExternalCommandWithInput(List<String> commandParts, File currentDirectory, String input) throws Exception {
+        File executable = findExecutable(commandParts.get(0));
+        if (executable == null) {
+            return;
+        }
+
+        Process process = new ProcessBuilder(commandParts)
+                .directory(currentDirectory)
+                .redirectError(ProcessBuilder.Redirect.INHERIT)
+                .redirectOutput(ProcessBuilder.Redirect.INHERIT)
+                .redirectInput(ProcessBuilder.Redirect.PIPE)
+                .start();
+
+        try (java.io.OutputStream processInput = process.getOutputStream()) {
+            processInput.write(input.getBytes());
+        }
+
+        process.waitFor();
+    }
+
+    private static void executeExternalCommandWithDiscardedOutput(List<String> commandParts, File currentDirectory) throws Exception {
+        File executable = findExecutable(commandParts.get(0));
+        if (executable == null) {
+            return;
+        }
+
+        Process process = new ProcessBuilder(commandParts)
+                .directory(currentDirectory)
+                .redirectError(ProcessBuilder.Redirect.INHERIT)
+                .redirectOutput(ProcessBuilder.Redirect.PIPE)
+                .start();
+
+        Thread drainer = new Thread(() -> {
+            try (java.io.InputStream inputStream = process.getInputStream()) {
+                inputStream.transferTo(java.io.OutputStream.nullOutputStream());
+            } catch (Exception ignored) {
+            }
+        });
+        drainer.start();
+        process.waitFor();
+        drainer.join();
+    }
+
+    private static List<String> buildJobLines(boolean includeRunningJobs) {
+        List<String> lines = new ArrayList<>();
+        if (BACKGROUND_JOBS.isEmpty()) {
+            return lines;
+        }
+
+        List<Job> completedJobs = new ArrayList<>();
+        int jobCount = BACKGROUND_JOBS.size();
+
+        for (int i = 0; i < jobCount; i++) {
+            Job job = BACKGROUND_JOBS.get(i);
+            String marker = i == jobCount - 1 ? "+" : i == jobCount - 2 ? "-" : " ";
+            boolean running = job.process.isAlive();
+
+            if (running) {
+                if (includeRunningJobs) {
+                    lines.add(job.format("Running", marker, true));
+                }
+            } else {
+                lines.add(job.format("Done", marker, false));
+                completedJobs.add(job);
+            }
+        }
+
+        if (!completedJobs.isEmpty()) {
+            BACKGROUND_JOBS.removeAll(completedJobs);
+        }
+
+        return lines;
     }
 
     private static int nextJobNumber() {
